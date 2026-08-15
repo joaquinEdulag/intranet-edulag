@@ -229,25 +229,6 @@ async function provisionarUsuariosMapeados() {
             continue;
         }
 
-        if (!usuarioEntra.numero_empleado) {
-            await supabase
-                .from('usuarios_entra')
-                .update({
-                    estado_vinculacion:
-                        'PENDIENTE',
-
-                    motivo_pendiente:
-                        'El usuario no tiene employeeId en Entra.'
-                })
-                .eq(
-                    'entra_object_id',
-                    usuarioEntra.entra_object_id
-                );
-
-            pendientes++;
-            continue;
-        }
-
         const mapeo =
             mapeosPorDepartamento.get(
                 normalizar(
@@ -329,7 +310,7 @@ async function provisionarUsuariosMapeados() {
             .upsert(
                 datosUsuario,
                 {
-                    onConflict: 'numero_empleado'
+                    onConflict: 'entra_object_id'
                 }
             )
             .select('id')

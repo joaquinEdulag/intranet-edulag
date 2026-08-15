@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Prueba de acceso | EDULAG</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            background: #f2f5f7;
+            color: #243039;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 560px;
+            padding: 32px;
+            border-radius: 16px;
+            background: white;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.10);
+        }
+
+        h1 {
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+
+        .description {
+            margin-bottom: 24px;
+            color: #5d6970;
+            line-height: 1.5;
+        }
+
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        button {
+            padding: 12px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        #login-button {
+            background: #0067b8;
+            color: white;
+        }
+
+        #logout-button {
+            background: #dfe5e8;
+            color: #243039;
+        }
+
+        #result {
+            min-height: 100px;
+            margin-top: 24px;
+            padding: 16px;
+            overflow: auto;
+            border-radius: 8px;
+            background: #152027;
+            color: #e8f1f5;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .success {
+            border-left: 6px solid #21a366;
+        }
+
+        .error {
+            border-left: 6px solid #d83b01;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="card">
+        <h1>Acceso a Intranet EDULAG</h1>
+
+        <p class="description">
+            Prueba temporal de inicio de sesión utilizando
+            la cuenta institucional de Microsoft.
+        </p>
+
+        <div class="buttons">
+            <button id="login-button" disabled>
+                Iniciar sesión con Microsoft
+            </button>
+
+            <button id="logout-button" disabled>
+                Cerrar sesión
+            </button>
+        </div>
+
+        <pre id="result">Preparando autenticación...</pre>
+    </main>
+
+    <script type="module">
+        import {
+            createClient
+        } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        const loginButton =
+            document.querySelector('#login-button');
+
+        const logoutButton =
+            document.querySelector('#logout-button');
+
+        const result =
+            document.querySelector('#result');
+
+        let supabase;
+
+        function mostrarResultado(
+            contenido,
+            tipo = ''
+        ) {
+            result.className = tipo;
+
+            result.textContent =
+                typeof contenido === 'string'
+                    ? contenido
+                    : JSON.stringify(contenido, null, 2);
+        }
+
+        async function validarAcceso(session) {
+            mostrarResultado(
+                'Microsoft confirmó tu identidad. ' +
+                'Validando autorización en EDULAG...'
+            );
+
+            const response = await fetch(
+                '/api/auth/me',
+                {
+                    headers: {
+                        Authorization:
+                            `Bearer ${session.access_token}`
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                mostrarResultado(data, 'error');
+                return;
+            }
+
+            mostrarResultado(data, 'success');
+
+            loginButton.disabled = true;
+            logoutButton.disabled = false;
+        }
+
+        async function iniciarSesion() {
+            loginButton.disabled = true;
+
+            mostrarResultado(
+                'Abriendo el inicio de sesión de Microsoft...'
+            );
+
+            const { error } =
+                await supabase.auth.signInWithOAuth({
+                    provider: 'azure',
+                    options: {
+                        scopes: 'email',
+                        redirectTo:
+                            `${window.location.origin}/auth-test.html`
+                    }
+                });
+
+            if (error) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No se pudo iniciar el acceso con Microsoft.',
+                        error: error.message
+                    },
+                    'error'
+                );
+
+                loginButton.disabled = false;
+            }
+        }
+
+        async function cerrarSesion() {
+            const { error } =
+                await supabase.auth.signOut();
+
+            if (error) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No se pudo cerrar la sesión.',
+                        error: error.message
+                    },
+                    'error'
+                );
+
+                return;
+            }
+
+            mostrarResultado(
+                'Sesión cerrada correctamente.'
+            );
+
+            loginButton.disabled = false;
+            logoutButton.disabled = true;
+        }
+
+        async function prepararPrueba() {
+            try {
+                const configResponse =
+                    await fetch('/api/auth/config');
+
+                const config =
+                    await configResponse.json();
+
+                if (!configResponse.ok) {
+                    throw new Error(
+                        config.mensaje ||
+                        'No se pudo obtener la configuración.'
+                    );
+                }
+
+                supabase = createClient(
+                    config.supabaseUrl,
+                    config.supabasePublishableKey,
+                    {
+                        auth: {
+                            persistSession: true,
+                            autoRefreshToken: true,
+                            detectSessionInUrl: true
+                        }
+                    }
+                );
+
+                loginButton.addEventListener(
+                    'click',
+                    iniciarSesion
+                );
+
+                logoutButton.addEventListener(
+                    'click',
+                    cerrarSesion
+                );
+
+                const {
+                    data: { session },
+                    error
+                } = await supabase.auth.getSession();
+
+                if (error) {
+                    throw error;
+                }
+
+                if (session) {
+                    await validarAcceso(session);
+                    return;
+                }
+
+                mostrarResultado(
+                    'Configuración correcta. ' +
+                    'Presiona “Iniciar sesión con Microsoft”.'
+                );
+
+                loginButton.disabled = false;
+            } catch (error) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No fue posible preparar la prueba.',
+                        error: error.message
+                    },
+                    'error'
+                );
+            }
+        }
+
+        prepararPrueba();
+    </script>
+</body>
+</html>
