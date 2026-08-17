@@ -17,5 +17,8 @@
         "dotenv": "^17.4.2",
         "express": "^5.2.1"
     },
-    "packageManager": "pnpm@11.21.0"
+    "packageManager": "pnpm@11.21.0",
+    "devDependencies": {
+        "supabase": "^2.114.0"
+    }
 }

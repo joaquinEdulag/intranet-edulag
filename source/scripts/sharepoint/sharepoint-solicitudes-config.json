@@ -1,0 +1,14 @@
+﻿{
+    "TenantHost":  "edulag.sharepoint.com",
+    "SitePath":  "sites/SistemasTI",
+    "SiteId":  "edulag.sharepoint.com,1dd1d08a-a884-44d5-807b-faa44282c58b,238c09da-58a9-4f76-a0d1-4a551b154f0c",
+    "ListName":  "SolicitudesAutorizacion",
+    "ListId":  "cd67015d-4fc9-4a5c-86fc-434b0df91256",
+    "ListUrl":  "https://edulag.sharepoint.com/sites/SistemasTI/Lists/SolicitudesAutorizacion",
+    "CustomColumnsExpected":  45,
+    "CustomColumnsCreatedNow":  40,
+    "CustomColumnsAlreadyPresent":  5,
+    "TitleInternalName":  "Title",
+    "TitleDisplayName":  "Folio",
+    "GeneratedAtUtc":  "2026-08-17T20:30:45.1052775Z"
+}
