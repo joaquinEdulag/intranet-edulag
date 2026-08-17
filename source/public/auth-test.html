@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Prueba de acceso | EDULAG</title>
 
@@ -28,7 +26,7 @@
 
         .card {
             width: 100%;
-            max-width: 560px;
+            max-width: 680px;
             padding: 32px;
             border-radius: 16px;
             background: white;
@@ -75,6 +73,68 @@
             color: #243039;
         }
 
+        #solicitud-button {
+            background: #21a366;
+            color: white;
+        }
+
+        .request-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #dfe5e8;
+        }
+
+        .request-section[hidden] {
+            display: none;
+        }
+
+        .request-section h2 {
+            margin: 0 0 16px;
+            font-size: 20px;
+        }
+
+        .request-form {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .field {
+            display: grid;
+            gap: 6px;
+        }
+
+        .field-full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #b7c1c7;
+            border-radius: 8px;
+            background: white;
+            color: #243039;
+            font: inherit;
+        }
+
+        textarea {
+            min-height: 92px;
+            resize: vertical;
+        }
+
+        #crear-solicitud-button {
+            justify-self: start;
+            background: #21a366;
+            color: white;
+        }
+
         #result {
             min-height: 100px;
             margin-top: 24px;
@@ -93,6 +153,20 @@
 
         .error {
             border-left: 6px solid #d83b01;
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 24px;
+            }
+
+            .request-form {
+                grid-template-columns: 1fr;
+            }
+
+            .field-full {
+                grid-column: auto;
+            }
         }
     </style>
 </head>
@@ -114,7 +188,85 @@
             <button id="logout-button" disabled>
                 Cerrar sesión
             </button>
+
+            <button id="solicitud-button" disabled>
+                Probar solicitud
+            </button>
         </div>
+
+        <section
+            id="request-section"
+            class="request-section"
+            hidden
+        >
+            <h2>Nueva solicitud de entrada o salida</h2>
+
+            <form id="request-form" class="request-form">
+                <div class="field">
+                    <label for="request-type">
+                        Tipo de solicitud
+                    </label>
+
+                    <select id="request-type" required>
+                        <option value="ENTRADA_TARDE">
+                            Entrada tarde
+                        </option>
+                        <option value="SALIDA_TEMPRANO">
+                            Salida temprano
+                        </option>
+                    </select>
+                </div>
+
+                <div class="field">
+                    <label for="request-date">Fecha</label>
+                    <input
+                        id="request-date"
+                        type="date"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="request-time">
+                        Hora solicitada
+                    </label>
+                    <input
+                        id="request-time"
+                        type="time"
+                        required
+                    >
+                </div>
+
+                <div class="field field-full">
+                    <label for="request-reason">Motivo</label>
+                    <textarea
+                        id="request-reason"
+                        maxlength="500"
+                        required
+                        placeholder="Explica brevemente el motivo de tu solicitud."
+                    ></textarea>
+                </div>
+
+                <div class="field field-full">
+                    <label for="request-observations">
+                        Observaciones (opcional)
+                    </label>
+                    <textarea
+                        id="request-observations"
+                        maxlength="500"
+                        placeholder="Agrega información complementaria si es necesaria."
+                    ></textarea>
+                </div>
+
+                <button
+                    id="crear-solicitud-button"
+                    class="field-full"
+                    type="submit"
+                >
+                    Enviar solicitud
+                </button>
+            </form>
+        </section>
 
         <pre id="result">Preparando autenticación...</pre>
     </main>
@@ -133,7 +285,59 @@
         const result =
             document.querySelector('#result');
 
+        const solicitudButton =
+            document.querySelector(
+                '#solicitud-button'
+            );
+
+        const requestSection =
+            document.querySelector('#request-section');
+
+        const requestForm =
+            document.querySelector('#request-form');
+
+        const requestType =
+            document.querySelector('#request-type');
+
+        const requestDate =
+            document.querySelector('#request-date');
+
+        const requestTime =
+            document.querySelector('#request-time');
+
+        const requestReason =
+            document.querySelector('#request-reason');
+
+        const requestObservations =
+            document.querySelector('#request-observations');
+
+        const crearSolicitudButton =
+            document.querySelector(
+                '#crear-solicitud-button'
+            );
+
+        let sessionActual = null;
+
         let supabase;
+
+        function fechaLocalISO() {
+            const ahora = new Date();
+
+            ahora.setMinutes(
+                ahora.getMinutes() -
+                ahora.getTimezoneOffset()
+            );
+
+            return ahora.toISOString().slice(0, 10);
+        }
+
+        function cambiarEstadoFormulario(habilitado) {
+            requestSection.hidden = !habilitado;
+
+            for (const control of requestForm.elements) {
+                control.disabled = !habilitado;
+            }
+        }
 
         function mostrarResultado(
             contenido,
@@ -148,6 +352,8 @@
         }
 
         async function validarAcceso(session) {
+            sessionActual = session;
+
             mostrarResultado(
                 'Microsoft confirmó tu identidad. ' +
                 'Validando autorización en EDULAG...'
@@ -165,15 +371,163 @@
 
             const data = await response.json();
 
+            logoutButton.disabled = false;
+
             if (!response.ok) {
                 mostrarResultado(data, 'error');
+                solicitudButton.disabled = true;
+                cambiarEstadoFormulario(false);
                 return;
             }
 
             mostrarResultado(data, 'success');
 
             loginButton.disabled = true;
-            logoutButton.disabled = false;
+
+            solicitudButton.disabled =
+                !data.perfil?.puedeSolicitar;
+
+            cambiarEstadoFormulario(
+                Boolean(data.perfil?.puedeSolicitar)
+            );
+        }
+
+        async function crearSolicitud(event) {
+            event.preventDefault();
+
+            if (!sessionActual) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No existe una sesión activa.'
+                    },
+                    'error'
+                );
+
+                return;
+            }
+
+            crearSolicitudButton.disabled = true;
+
+            mostrarResultado(
+                'Creando la solicitud y validando el horario...'
+            );
+
+            try {
+                const response = await fetch(
+                    '/api/solicitudes/entrada-salida',
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization:
+                                `Bearer ${sessionActual.access_token}`,
+                            'Content-Type':
+                                'application/json'
+                        },
+                        body: JSON.stringify({
+                            tipo: requestType.value,
+                            fecha: requestDate.value,
+                            horaSolicitada: requestTime.value,
+                            motivo: requestReason.value,
+                            observaciones:
+                                requestObservations.value || null
+                        })
+                    }
+                );
+
+                const data = await response.json();
+
+                mostrarResultado(
+                    data,
+                    response.ok ? 'success' : 'error'
+                );
+
+                if (response.ok) {
+                    requestReason.value = '';
+                    requestObservations.value = '';
+                }
+            } catch (error) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No fue posible enviar la solicitud.',
+                        error: error.message
+                    },
+                    'error'
+                );
+            } finally {
+                crearSolicitudButton.disabled = false;
+            }
+        }
+
+        async function probarSolicitud() {
+            if (!sessionActual) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No existe una sesión activa.'
+                    },
+                    'error'
+                );
+
+                return;
+            }
+
+            solicitudButton.disabled = true;
+
+            mostrarResultado(
+                'Validando si el perfil puede crear ' +
+                'una solicitud...'
+            );
+
+            try {
+                const response = await fetch(
+                    '/api/solicitudes/prueba',
+                    {
+                        method: 'POST',
+
+                        headers: {
+                            Authorization:
+                                `Bearer ${sessionActual.access_token}`,
+
+                            'Content-Type':
+                                'application/json'
+                        },
+
+                        body: JSON.stringify({
+                            tipo:
+                                'PRUEBA_TECNICA'
+                        })
+                    }
+                );
+
+                const data =
+                    await response.json();
+
+                mostrarResultado(
+                    data,
+                    response.ok
+                        ? 'success'
+                        : 'error'
+                );
+            } catch (error) {
+                mostrarResultado(
+                    {
+                        ok: false,
+                        mensaje:
+                            'No fue posible ejecutar ' +
+                            'la prueba de solicitud.',
+                        error:
+                            error.message
+                    },
+                    'error'
+                );
+            } finally {
+                solicitudButton.disabled = false;
+            }
         }
 
         async function iniciarSesion() {
@@ -188,8 +542,13 @@
                     provider: 'azure',
                     options: {
                         scopes: 'email',
+
                         redirectTo:
-                            `${window.location.origin}/auth-test.html`
+                            `${window.location.origin}/auth-test.html`,
+
+                        queryParams: {
+                            prompt: 'login'
+                        }
                     }
                 });
 
@@ -230,8 +589,12 @@
                 'Sesión cerrada correctamente.'
             );
 
+            sessionActual = null;
+
             loginButton.disabled = false;
             logoutButton.disabled = true;
+            solicitudButton.disabled = true;
+            cambiarEstadoFormulario(false);
         }
 
         async function prepararPrueba() {
@@ -271,6 +634,21 @@
                     cerrarSesion
                 );
 
+                solicitudButton.addEventListener(
+                    'click',
+                    probarSolicitud
+                );
+
+                requestForm.addEventListener(
+                    'submit',
+                    crearSolicitud
+                );
+
+                const hoy = fechaLocalISO();
+
+                requestDate.min = hoy;
+                requestDate.value = hoy;
+
                 const {
                     data: { session },
                     error
@@ -307,4 +685,5 @@
         prepararPrueba();
     </script>
 </body>
+
 </html>
