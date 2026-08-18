@@ -194,7 +194,6 @@ $columns = @(
     (New-TextColumn -Name 'TipoNombre' -DisplayName 'Tipo de solicitud' -MaxLength 80 -Required $true),
     (New-ChoiceColumn -Name 'EstadoGeneral' -DisplayName 'Estado general' -DefaultValue 'PENDIENTE_JEFE' -Indexed $true -Choices @(
         'PENDIENTE_JEFE',
-        'PENDIENTE_ALTA_DIRECCION',
         'PENDIENTE_RH',
         'CERRADA_APROBADA',
         'CERRADA_RECHAZADA',
@@ -240,34 +239,16 @@ $columns = @(
     )),
     (New-MultilineTextColumn -Name 'ComentarioJefe' -DisplayName 'Comentario del encargado' -Lines 6),
     (New-DateColumn -Name 'FechaRespuestaJefe' -DisplayName 'Fecha de respuesta del encargado' -Format 'dateTime'),
-    (New-TextColumn -Name 'AprobacionMicrosoftId' -DisplayName 'ID de aprobación del encargado' -MaxLength 255 -Indexed $true),
-
-    (New-NumberColumn -Name 'AltaDireccionId' -DisplayName 'ID de Alta Dirección' -Minimum 1),
-    (New-TextColumn -Name 'AltaDireccionNombre' -DisplayName 'Responsable de Alta Dirección' -MaxLength 255),
-    (New-TextColumn -Name 'AltaDireccionCorreo' -DisplayName 'Correo de Alta Dirección' -MaxLength 255 -Indexed $true),
-    (New-ChoiceColumn -Name 'EstadoAltaDireccion' -DisplayName 'Estado de Alta Dirección' -DefaultValue 'PENDIENTE' -Indexed $true -Choices @(
-        'PENDIENTE',
-        'APROBADA',
-        'RECHAZADA',
-        'NO_APLICA'
-    )),
-    (New-MultilineTextColumn -Name 'ComentarioAltaDireccion' -DisplayName 'Comentario de Alta Dirección' -Lines 6),
-    (New-DateColumn -Name 'FechaRespuestaAltaDireccion' -DisplayName 'Fecha de respuesta de Alta Dirección' -Format 'dateTime'),
-    # Las listas de SharePoint limitan el nombre interno a 32 caracteres.
-    # La columna creada en la primera ejecución quedó con este nombre interno.
-    (New-TextColumn -Name 'AprobacionAltaDireccionMicrosoft' -DisplayName 'ID de aprobación de Alta Dirección' -MaxLength 255 -Indexed $true),
+    (New-TextColumn -Name 'AprobacionMicrosoftId' -DisplayName 'ID de aprobación de Microsoft' -MaxLength 255 -Indexed $true),
 
     (New-ChoiceColumn -Name 'EstadoRH' -DisplayName 'Estado de RH' -DefaultValue 'NO_APLICA' -Indexed $true -Choices @(
         'NO_APLICA',
         'PENDIENTE',
         'ENTERADO'
     )),
-    (New-NumberColumn -Name 'RHId' -DisplayName 'ID del responsable de RH' -Minimum 1),
-    (New-TextColumn -Name 'RHNombre' -DisplayName 'Responsable de RH' -MaxLength 255),
     (New-MultilineTextColumn -Name 'ComentarioRH' -DisplayName 'Comentario de RH' -Lines 6),
     (New-TextColumn -Name 'CorreoRH' -DisplayName 'Correo de RH' -MaxLength 255),
     (New-DateColumn -Name 'FechaEnteradoRH' -DisplayName 'Fecha de enterado de RH' -Format 'dateTime'),
-    (New-TextColumn -Name 'AprobacionRHMicrosoftId' -DisplayName 'ID de aprobación de RH' -MaxLength 255 -Indexed $true),
 
     (New-BooleanColumn -Name 'NotificacionCierreEnviada' -DisplayName 'Notificación de cierre enviada'),
     (New-BooleanColumn -Name 'PendienteSincronizarSupabase' -DisplayName 'Pendiente de sincronizar con Supabase' -Indexed $true),
@@ -495,22 +476,6 @@ try {
             -Body $metadataDefinition `
             -ContentType 'application/json' |
             Out-Null
-
-        # Las opciones de columnas Choice pueden cambiar con el flujo.
-        # Se aplican también a columnas existentes para incorporar nuevos
-        # estados sin eliminar los elementos que ya tiene la lista.
-        if ($columnType -eq 'choice') {
-            $choiceDefinition = @{
-                choice = $column.choice
-            } | ConvertTo-Json -Depth 20
-
-            Invoke-MgGraphRequest `
-                -Method PATCH `
-                -Uri $columnUri `
-                -Body $choiceDefinition `
-                -ContentType 'application/json' |
-                Out-Null
-        }
 
         # El valor inicial se configura antes de volver obligatoria la columna.
         if ($column.ContainsKey('defaultValue')) {

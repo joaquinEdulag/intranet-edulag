@@ -11,6 +11,10 @@ import {
 import apiRoutes
     from './routes/index.js';
 
+import {
+    iniciarWorkerSharePoint
+} from './workers/sharepoint-sync.worker.js';
+
 const app =
     express();
 
@@ -119,4 +123,6 @@ app.listen(port, () => {
     console.log(
         `Servidor ejecutándose en http://localhost:${port}`
     );
+
+    iniciarWorkerSharePoint();
 });

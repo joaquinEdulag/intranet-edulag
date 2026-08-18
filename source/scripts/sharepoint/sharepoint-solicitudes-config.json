@@ -5,10 +5,10 @@
     "ListName":  "SolicitudesAutorizacion",
     "ListId":  "cd67015d-4fc9-4a5c-86fc-434b0df91256",
     "ListUrl":  "https://edulag.sharepoint.com/sites/SistemasTI/Lists/SolicitudesAutorizacion",
-    "CustomColumnsExpected":  45,
-    "CustomColumnsCreatedNow":  40,
-    "CustomColumnsAlreadyPresent":  5,
+    "CustomColumnsExpected":  55,
+    "CustomColumnsCreatedNow":  0,
+    "CustomColumnsAlreadyPresent":  55,
     "TitleInternalName":  "Title",
     "TitleDisplayName":  "Folio",
-    "GeneratedAtUtc":  "2026-08-17T20:30:45.1052775Z"
+    "GeneratedAtUtc":  "2026-08-18T15:14:01.4765340Z"
 }

@@ -56,3 +56,293 @@ export async function crearSolicitudEntradaSalida({
 
     return data;
 }
+
+function requerirResultado(data, error, descripcion) {
+    if (error) {
+        throw new Error(
+            `No fue posible consultar ${descripcion}: `
+            + error.message
+        );
+    }
+
+    if (!data) {
+        throw new Error(
+            `No se encontró ${descripcion}.`
+        );
+    }
+
+    return data;
+}
+
+function requerirColeccion(data, error, descripcion) {
+    if (error) {
+        throw new Error(
+            `No fue posible consultar ${descripcion}: `
+            + error.message
+        );
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error(
+            `No se encontró ${descripcion}.`
+        );
+    }
+
+    return data;
+}
+
+function construirResponsableEtapa({
+    etapa,
+    ordenEsperado,
+    seguimientos,
+    usuariosPorId
+}) {
+    const coincidencias = seguimientos.filter(
+        seguimiento => seguimiento.etapa === etapa
+    );
+
+    if (coincidencias.length !== 1) {
+        throw new Error(
+            `La solicitud debe tener exactamente una etapa ${etapa}.`
+        );
+    }
+
+    const seguimiento = coincidencias[0];
+
+    if (Number(seguimiento.orden_etapa) !== ordenEsperado) {
+        throw new Error(
+            `La etapa ${etapa} debe tener el orden ${ordenEsperado}.`
+        );
+    }
+
+    const usuario = usuariosPorId.get(
+        Number(seguimiento.id_responsable_usuario)
+    );
+
+    if (!usuario) {
+        throw new Error(
+            `No se encontró el usuario responsable de la etapa ${etapa}.`
+        );
+    }
+
+    const correo = String(
+        seguimiento.correo_responsable_snapshot ??
+        usuario.correo_microsoft ??
+        ''
+    ).trim().toLowerCase();
+
+    if (!correo) {
+        throw new Error(
+            `El responsable de la etapa ${etapa} no tiene correo Microsoft.`
+        );
+    }
+
+    return {
+        idSeguimiento: seguimiento.id,
+        etapa: seguimiento.etapa,
+        orden: Number(seguimiento.orden_etapa),
+        idUsuario: Number(
+            seguimiento.id_responsable_usuario
+        ),
+        nombre: usuario.nombre_empleado,
+        correo,
+        puesto: usuario.puesto ?? null,
+        estado: seguimiento.estado,
+        comentario: seguimiento.comentario ?? null,
+        idAprobacionMicrosoft:
+            seguimiento.id_aprobacion_microsoft ?? null,
+        fechaAsignacion:
+            seguimiento.fecha_asignacion ?? null,
+        fechaRespuesta:
+            seguimiento.fecha_respuesta ?? null
+    };
+}
+
+export async function obtenerEntradaSalidaParaSharePoint(
+    idSolicitud
+) {
+    const solicitudId = Number(idSolicitud);
+
+    if (
+        !Number.isInteger(solicitudId) ||
+        solicitudId <= 0
+    ) {
+        throw new Error(
+            'El ID de solicitud debe ser un entero mayor que cero.'
+        );
+    }
+
+    const {
+        data: solicitud,
+        error: errorSolicitud
+    } = await supabase
+        .from('solicitudes')
+        .select(`
+            id,
+            id_usuario,
+            id_tipo_solicitud,
+            id_area,
+            id_turno,
+            id_jefe_usuario,
+            fecha_solicitud,
+            folio,
+            codigo_formato,
+            numero_revision,
+            fecha_revision_formato,
+            estado,
+            contexto_snapshot
+        `)
+        .eq('id', solicitudId)
+        .maybeSingle();
+
+    requerirResultado(
+        solicitud,
+        errorSolicitud,
+        `la solicitud ${solicitudId}`
+    );
+
+    const [
+        resultadoTipo,
+        resultadoDetalle,
+        resultadoSeguimientos
+    ] = await Promise.all([
+        supabase
+            .from('tipo_solicitud')
+            .select('clave, nombre')
+            .eq(
+                'id',
+                solicitud.id_tipo_solicitud
+            )
+            .maybeSingle(),
+
+        supabase
+            .from('entrada_salida')
+            .select(`
+                fecha,
+                hora_solicitada,
+                minutos_solicitados,
+                motivo,
+                observaciones
+            `)
+            .eq('id_solicitud', solicitudId)
+            .maybeSingle(),
+
+        supabase
+            .from('seguimiento_solicitud')
+            .select(`
+                id,
+                etapa,
+                orden_etapa,
+                id_responsable_usuario,
+                correo_responsable_snapshot,
+                estado,
+                comentario,
+                id_aprobacion_microsoft,
+                fecha_asignacion,
+                fecha_respuesta
+            `)
+            .eq('id_solicitud', solicitudId)
+            .order('orden_etapa', {
+                ascending: true
+            })
+    ]);
+
+    const tipo = requerirResultado(
+        resultadoTipo.data,
+        resultadoTipo.error,
+        'el tipo de solicitud'
+    );
+
+    const detalle = requerirResultado(
+        resultadoDetalle.data,
+        resultadoDetalle.error,
+        'el detalle de entrada o salida'
+    );
+
+    const seguimientos = requerirColeccion(
+        resultadoSeguimientos.data,
+        resultadoSeguimientos.error,
+        `las etapas de la solicitud ${solicitudId}`
+    );
+
+    const etapasRequeridas = [
+        'JEFE',
+        'ALTA_DIRECCION',
+        'RH'
+    ];
+
+    const idsResponsables = [
+        ...new Set(
+            seguimientos
+                .filter(seguimiento => (
+                    etapasRequeridas.includes(
+                        seguimiento.etapa
+                    )
+                ))
+                .map(seguimiento => (
+                    Number(
+                        seguimiento.id_responsable_usuario
+                    )
+                ))
+        )
+    ];
+
+    if (idsResponsables.length === 0) {
+        throw new Error(
+            'La solicitud no tiene responsables de aprobación configurados.'
+        );
+    }
+
+    const {
+        data: usuariosResponsables,
+        error: errorResponsables
+    } = await supabase
+        .from('usuarios')
+        .select(`
+            id,
+            nombre_empleado,
+            correo_microsoft,
+            puesto
+        `)
+        .in('id', idsResponsables);
+
+    const responsables = requerirColeccion(
+        usuariosResponsables,
+        errorResponsables,
+        'los usuarios responsables de aprobación'
+    );
+
+    const usuariosPorId = new Map(
+        responsables.map(
+            usuario => [Number(usuario.id), usuario]
+        )
+    );
+
+    const aprobaciones = {
+        jefe: construirResponsableEtapa({
+            etapa: 'JEFE',
+            ordenEsperado: 1,
+            seguimientos,
+            usuariosPorId
+        }),
+        altaDireccion: construirResponsableEtapa({
+            etapa: 'ALTA_DIRECCION',
+            ordenEsperado: 2,
+            seguimientos,
+            usuariosPorId
+        }),
+        rh: construirResponsableEtapa({
+            etapa: 'RH',
+            ordenEsperado: 3,
+            seguimientos,
+            usuariosPorId
+        })
+    };
+
+    return {
+        solicitud,
+        tipo,
+        detalle,
+        aprobaciones
+    };
+}

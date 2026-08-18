@@ -5,7 +5,10 @@
     "main": "./source/server.js",
     "scripts": {
         "start": "node source/server.js",
-        "sync:entra": "node source/scripts/sync-entra.js"
+        "sync:entra": "node source/scripts/sync-entra.js",
+        "test:sharepoint": "node source/scripts/test-sharepoint.js",
+        "sync:sharepoint": "node source/scripts/sync-sharepoint.js",
+        "sync:sharepoint:force": "node source/scripts/sync-sharepoint.js --force"
     },
     "keywords": [],
     "author": "",

@@ -1,2 +1,7 @@
-/node_modules
+node_modules/
 .env
+*.log
+
+# Archivo local generado al aprovisionar SharePoint.
+source/scripts/sharepoint/sharepoint-solicitudes-config.json
+

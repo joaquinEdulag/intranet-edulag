@@ -2,6 +2,10 @@ import {
     crearSolicitudEntradaSalida
 } from '../services/solicitudes.service.js';
 
+import {
+    sincronizarSolicitudSharePoint
+} from '../services/sincronizacion-sharepoint.service.js';
+
 const TIPOS_ENTRADA_SALIDA = new Set([
     'ENTRADA_TARDE',
     'SALIDA_TEMPRANO'
@@ -192,11 +196,49 @@ export async function crearEntradaSalida(
                 }
             });
 
+        let sharePoint;
+
+        try {
+            sharePoint =
+                await sincronizarSolicitudSharePoint(
+                    solicitud.idSolicitud
+                );
+        } catch (errorSincronizacion) {
+            console.error(
+                'La solicitud fue creada, pero no se pudo iniciar '
+                + 'la sincronización con SharePoint:',
+                errorSincronizacion
+            );
+
+            sharePoint = {
+                ok: false,
+                estado: 'PENDIENTE',
+                codigoError:
+                    'ERROR_INICIO_SINCRONIZACION',
+                ultimoError:
+                    errorSincronizacion.message
+            };
+        }
+
+        const sincronizada =
+            sharePoint.estado === 'SINCRONIZADA';
+
+        const sharePointPublico = {
+            ...sharePoint,
+            ultimoError:
+                process.env.NODE_ENV === 'development'
+                    ? sharePoint.ultimoError
+                    : undefined
+        };
+
         return res.status(201).json({
             ok: true,
             mensaje:
-                'La solicitud fue creada y enviada al responsable.',
-            solicitud
+                sincronizada
+                    ? 'La solicitud fue creada y sincronizada con SharePoint.'
+                    : 'La solicitud fue creada correctamente y está pendiente de sincronización con SharePoint.',
+            solicitud,
+            sharePoint: sharePointPublico
         });
     } catch (error) {
         console.error(
