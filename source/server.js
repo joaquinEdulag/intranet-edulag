@@ -44,11 +44,7 @@ app.use(
 );
 
 app.get('/', (req, res) => {
-    res.json({
-        ok: true,
-        mensaje:
-            'Servidor de Edulag funcionando'
-    });
+    res.sendFile(path.join(publicDirectory, 'index.html'));
 });
 
 app.get(

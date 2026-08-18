@@ -193,10 +193,16 @@ export function construirCamposEntradaSalidaSharePoint({
         TurnoId: solicitud.id_turno,
         TurnoNombre: turno.nombre,
 
-        FechaEvento: detalle.fecha,
+        FechaEvento:
+            detalle.fecha ??
+            detalle.fecha_inicio ??
+            detalle.fecha_hora_inicio?.slice(0, 10) ??
+            detalle.fecha_hora_salida?.slice(0, 10),
         HoraSolicitada: detalle.hora_solicitada,
         MinutosSolicitados:
-            Number(detalle.minutos_solicitados),
+            detalle.minutos_solicitados == null
+                ? undefined
+                : Number(detalle.minutos_solicitados),
         Motivo: detalle.motivo,
         Observaciones: detalle.observaciones,
         DetalleJson: JSON.stringify({

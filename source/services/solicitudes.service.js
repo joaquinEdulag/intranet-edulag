@@ -10,6 +10,75 @@ const FORMATO_ENTRADA_SALIDA = {
     fechaRevision: '2026-08-15'
 };
 
+const FORMATOS = {
+    HORAS_EXTRA: 'EDULAG-AUT-HXE',
+    PERMISO_CON_GOCE: 'EDULAG-AUT-PCG',
+    PERMISO_SIN_GOCE: 'EDULAG-AUT-PSG',
+    ENTRADA_TARDE: 'EDULAG-AUT-ENT-SAL',
+    SALIDA_TEMPRANO: 'EDULAG-AUT-ENT-SAL',
+    AUSENCIA_TEMPORAL: 'EDULAG-AUT-AUT',
+    MODIFICACION_TURNO: 'EDULAG-AUT-MDT',
+    VACACIONES: 'EDULAG-AUT-VAC'
+};
+
+export async function crearSolicitud({
+    idUsuario,
+    tipo,
+    detalle,
+    contextoCliente = {}
+}) {
+    const codigoFormato = FORMATOS[tipo];
+
+    if (!codigoFormato) {
+        throw new Error('TIPO_NO_PERMITIDO: el tipo de solicitud no está habilitado.');
+    }
+
+    const { data, error } = await supabase.rpc(
+        'crear_solicitud_laboral',
+        {
+            p_id_usuario: idUsuario,
+            p_clave_tipo: tipo,
+            p_detalle: detalle,
+            p_codigo_formato: codigoFormato,
+            p_numero_revision: 1,
+            p_fecha_revision_formato: '2026-08-18',
+            p_contexto_cliente: contextoCliente
+        }
+    );
+
+    if (error) {
+        const solicitudError = new Error(error.message || 'No fue posible crear la solicitud.');
+        solicitudError.code = error.code;
+        solicitudError.details = error.details;
+        throw solicitudError;
+    }
+
+    return data;
+}
+
+export async function obtenerCatalogosSolicitud(idUsuario) {
+    const [turnos, saldos] = await Promise.all([
+        supabase.from('turno').select('id, id_area, nombre_turno, horas_semanales').eq('activo', true).order('nombre_turno'),
+        supabase.from('saldo_vacaciones').select('id, periodo_inicio, periodo_fin, dias_otorgados, dias_reservados, dias_utilizados, dias_disponibles').eq('id_usuario', idUsuario).gte('periodo_fin', new Date().toISOString().slice(0, 10)).order('periodo_inicio')
+    ]);
+
+    if (turnos.error) throw new Error(`No fue posible consultar los turnos: ${turnos.error.message}`);
+    if (saldos.error) throw new Error(`No fue posible consultar el saldo de vacaciones: ${saldos.error.message}`);
+    return { turnos: turnos.data ?? [], saldosVacaciones: saldos.data ?? [] };
+}
+
+export async function obtenerSolicitudesUsuario(idUsuario) {
+    const { data, error } = await supabase
+        .from('solicitudes')
+        .select('id, folio, fecha_solicitud, estado, tipo_solicitud:id_tipo_solicitud(clave,nombre)')
+        .eq('id_usuario', idUsuario)
+        .order('fecha_solicitud', { ascending: false })
+        .limit(50);
+
+    if (error) throw new Error(`No fue posible consultar las solicitudes: ${error.message}`);
+    return data ?? [];
+}
+
 export async function crearSolicitudEntradaSalida({
     idUsuario,
     tipo,
@@ -203,7 +272,6 @@ export async function obtenerEntradaSalidaParaSharePoint(
 
     const [
         resultadoTipo,
-        resultadoDetalle,
         resultadoSeguimientos
     ] = await Promise.all([
         supabase
@@ -213,18 +281,6 @@ export async function obtenerEntradaSalidaParaSharePoint(
                 'id',
                 solicitud.id_tipo_solicitud
             )
-            .maybeSingle(),
-
-        supabase
-            .from('entrada_salida')
-            .select(`
-                fecha,
-                hora_solicitada,
-                minutos_solicitados,
-                motivo,
-                observaciones
-            `)
-            .eq('id_solicitud', solicitudId)
             .maybeSingle(),
 
         supabase
@@ -253,10 +309,32 @@ export async function obtenerEntradaSalidaParaSharePoint(
         'el tipo de solicitud'
     );
 
+    const tablasDetalle = {
+        HORAS_EXTRA: 'horas_extra',
+        PERMISO_CON_GOCE: 'permisos',
+        PERMISO_SIN_GOCE: 'permisos',
+        ENTRADA_TARDE: 'entrada_salida',
+        SALIDA_TEMPRANO: 'entrada_salida',
+        AUSENCIA_TEMPORAL: 'ausencia_temporal',
+        MODIFICACION_TURNO: 'modificacion_turno',
+        VACACIONES: 'vacaciones'
+    };
+
+    const tablaDetalle = tablasDetalle[tipo.clave];
+    if (!tablaDetalle) {
+        throw new Error(`El tipo ${tipo.clave} no está habilitado para sincronización.`);
+    }
+
+    const resultadoDetalle = await supabase
+        .from(tablaDetalle)
+        .select('*')
+        .eq('id_solicitud', solicitudId)
+        .maybeSingle();
+
     const detalle = requerirResultado(
         resultadoDetalle.data,
         resultadoDetalle.error,
-        'el detalle de entrada o salida'
+        'el detalle de la solicitud'
     );
 
     const seguimientos = requerirColeccion(
