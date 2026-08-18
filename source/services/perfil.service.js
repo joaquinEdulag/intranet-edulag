@@ -218,13 +218,14 @@ export async function obtenerPerfilLaboral(
         datosFaltantes.push(
             'responsable_activo'
         );
-    } else if (
-        responsable.id === usuario.id
-    ) {
-        datosFaltantes.push(
-            'responsable_es_solicitante'
-        );
     }
+
+    // Ser jefe de la propia área no bloquea la creación. En este caso la
+    // solicitud omite la decisión JEFE y comienza en Alta Dirección.
+    const esJefeArea = Boolean(
+        responsable &&
+        responsable.id === usuario.id
+    );
 
     const puedeSolicitar =
         datosFaltantes.length === 0;
@@ -328,6 +329,13 @@ export async function obtenerPerfilLaboral(
                     : 'PENDIENTE_CONFIGURACION',
 
             puedeSolicitar,
+
+            esJefeArea,
+
+            primeraEtapaAprobacion:
+                esJefeArea
+                    ? 'ALTA_DIRECCION'
+                    : 'JEFE',
 
             datosFaltantes
         }

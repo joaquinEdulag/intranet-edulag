@@ -10,3 +10,10 @@ Portal Node.js + Express para autenticación corporativa con Microsoft y creaci�
 4. Instala dependencias con `pnpm install` y ejecuta `pnpm start`.
 
 La interfaz queda disponible en `http://localhost:3000/`.
+
+## Solicitudes de jefaturas
+
+Si el solicitante es el jefe vigente de su propia área, el sistema no bloquea
+su perfil ni genera una autoaprobación. La etapa JEFE queda registrada como
+omitida/cancelada para auditoría y la solicitud inicia directamente en
+`PENDIENTE_ALTA_DIRECCION`; después continúa con Recursos Humanos.
